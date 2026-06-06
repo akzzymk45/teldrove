@@ -17,6 +17,17 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
+      - name: 🚀 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: 📦 Clone Core TelDrive Backend (Latest Code)
+        uses: actions/checkout@v4
+        with:
+          repository: tgdrive/teldrive
+          path: teldrive-backend
+
       - name: ⚙️ Install Tools (Aria2 & Custom Rclone)
         run: |
           sudo apt-get update && sudo apt-get install -y aria2
@@ -26,23 +37,18 @@ jobs:
           sudo chmod +x /usr/bin/rclone
           rm -rf rclone-v1.73.1-linux-amd64*
 
-      - name: 🚀 Install Official TelDrive Binary
-        run: |
-          wget -q https://github.com/tgdrive/teldrive/releases/download/1.8.3/teldrive-1.8.3-linux-amd64.tar.gz
-          tar -xzf teldrive-1.8.3-linux-amd64.tar.gz
-          sudo mv teldrive /usr/bin/teldrive
-          sudo chmod +x /usr/bin/teldrive
-          rm -f teldrive-1.8.3-linux-amd64.tar.gz
-
       - name: 🌐 Start TelDrive Server in Background
         run: |
-          teldrive run \
+          cd teldrive-backend
+          # Running from latest source code fixes the Supabase PgBouncer crash!
+          go run main.go run \
             --db-data-source="${{ secrets.TELDRIVE_SUPABASE_DSN }}" \
             --jwt-secret="${{ secrets.TELDRIVE_JWT_SECRET }}" \
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
-          sleep 10
+          
+          sleep 15
           
       - name: 🔑 Configure Rclone Authentication
         run: |
@@ -60,16 +66,12 @@ jobs:
 
       - name: 📥 Download Movie to Azure Runner (Auto-Naming)
         run: |
-          # Create an empty folder to hold the movie
           mkdir movie_download
           cd movie_download
-          
-          # aria2c rips the file with 16 connections and auto-detects the filename!
           aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "${{ github.event.inputs.movie_url }}"
 
       - name: ☁️ Upload Movie to Telegram via TelDrive
         run: |
-          # rclone copies whatever file aria2c downloaded in the folder directly to Telegram
           rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
             --multi-thread-streams=8 \
             --multi-thread-chunk-size=100M \
