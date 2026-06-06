@@ -57,10 +57,13 @@ jobs:
           mkdir -p ~/.config/rclone
           cat <<EOF > ~/.config/rclone/rclone.conf
           [teldrive]
-          type = webdav
-          url = http://localhost:8080/webdav
-          vendor = other
-          bearer_token = ${{ secrets.TELDRIVE_TOKEN }}
+          type = teldrive
+          api_host = http://127.0.0.1:8080/
+          access_token = ${{ secrets.TELDRIVE_TOKEN }}
+          chunk_size = 500M
+          upload_concurrency = 2
+          encrypt_files = false
+          random_chunk_name = true
           EOF
 
       - name: 📥 Download Movie to Azure Runner
