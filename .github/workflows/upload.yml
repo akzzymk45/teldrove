@@ -1,4 +1,4 @@
-name: Stream Movie URL to TelDrive
+name: Ultimate Movie Uploader
 
 on:
   workflow_dispatch:
@@ -17,9 +17,9 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: ⚙️ Install Custom Teldrive Rclone
+      - name: ⚙️ Install Tools (Aria2 & Custom Rclone)
         run: |
-          echo "Downloading custom Rclone..."
+          sudo apt-get update && sudo apt-get install -y aria2
           wget -q https://github.com/tgdrive/rclone/releases/download/v1.73.1/rclone-v1.73.1-linux-amd64.zip
           unzip -q rclone-v1.73.1-linux-amd64.zip
           sudo mv rclone-v1.73.1-linux-amd64/rclone /usr/bin/rclone
@@ -28,7 +28,6 @@ jobs:
 
       - name: 🚀 Install Official TelDrive Binary
         run: |
-          echo "Downloading TelDrive 1.8.3..."
           wget -q https://github.com/tgdrive/teldrive/releases/download/1.8.3/teldrive-1.8.3-linux-amd64.tar.gz
           tar -xzf teldrive-1.8.3-linux-amd64.tar.gz
           sudo mv teldrive /usr/bin/teldrive
@@ -37,15 +36,12 @@ jobs:
 
       - name: 🌐 Start TelDrive Server in Background
         run: |
-          echo "Booting up TelDrive Server..."
           teldrive run \
             --db-data-source="${{ secrets.TELDRIVE_SUPABASE_DSN }}" \
             --jwt-secret="${{ secrets.TELDRIVE_JWT_SECRET }}" \
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
-          
-          # Wait 10 seconds to ensure the server starts properly
           sleep 10
           
       - name: 🔑 Configure Rclone Authentication
@@ -62,12 +58,19 @@ jobs:
           random_chunk_name = true
           EOF
 
-      - name: 🚀 Stream URL Directly to Telegram
+      - name: 📥 Download Movie to Azure Runner (Auto-Naming)
         run: |
-          echo "Streaming directly from URL to TelDrive Folder: teldrive:${{ github.event.inputs.folder_name }}"
-          # Using -a and --header-filename to automatically figure out the movie's actual name
-          rclone copyurl "${{ github.event.inputs.movie_url }}" teldrive:${{ github.event.inputs.folder_name }}/ \
-            -a --header-filename \
+          # Create an empty folder to hold the movie
+          mkdir movie_download
+          cd movie_download
+          
+          # aria2c rips the file with 16 connections and auto-detects the filename!
+          aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "${{ github.event.inputs.movie_url }}"
+
+      - name: ☁️ Upload Movie to Telegram via TelDrive
+        run: |
+          # rclone copies whatever file aria2c downloaded in the folder directly to Telegram
+          rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
             --multi-thread-streams=8 \
             --multi-thread-chunk-size=100M \
             --use-mmap \
