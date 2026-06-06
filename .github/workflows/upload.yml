@@ -1,14 +1,10 @@
-name: Upload Movie to TelDrive
+name: Stream Movie URL to TelDrive
 
 on:
   workflow_dispatch:
     inputs:
       movie_url:
         description: 'Direct Download URL of the Movie (e.g., http://.../movie.mp4)'
-        required: true
-        type: string
-      file_name:
-        description: 'File Name to save as (e.g., Inception.mp4)'
         required: true
         type: string
       folder_name:
@@ -49,7 +45,6 @@ jobs:
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
           
-          # Wait 10 seconds to ensure the server starts properly
           sleep 10
           
       - name: 🔑 Configure Rclone Authentication
@@ -61,22 +56,14 @@ jobs:
           api_host = http://127.0.0.1:8080/
           access_token = ${{ secrets.TELDRIVE_TOKEN }}
           chunk_size = 500M
-          upload_concurrency = 2
+          upload_concurrency = 4
           encrypt_files = false
           random_chunk_name = true
           EOF
 
-      - name: 📥 Download Movie to Azure Runner
+      - name: 🚀 Stream URL Directly to Telegram
         run: |
-          echo "Downloading movie from URL to Azure fast servers..."
-          wget -q --show-progress -O "${{ github.event.inputs.file_name }}" "${{ github.event.inputs.movie_url }}"
-
-      - name: ☁️ Upload Movie to Telegram via TelDrive
-        run: |
-          echo "Uploading to TelDrive Folder: teldrive:${{ github.event.inputs.folder_name }}"
-          rclone copy "${{ github.event.inputs.file_name }}" teldrive:${{ github.event.inputs.folder_name }}/ -v --progress
-          
-      - name: 🧹 Cleanup Space
-        run: |
-          echo "Upload complete! Deleting local file to free up runner space..."
-          rm -f "${{ github.event.inputs.file_name }}"
+          echo "Streaming directly from URL to TelDrive Folder: teldrive:${{ github.event.inputs.folder_name }}"
+          # Using -a and --header-filename to automatically figure out the movie's actual name
+          # The destination is now just the folder path, Rclone handles the file name!
+          rclone copyurl "${{ github.event.inputs.movie_url }}" teldrive:${{ github.event.inputs.folder_name }}/ -a --header-filename --stats 10s --stats-one-line -v
