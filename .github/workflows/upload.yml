@@ -17,17 +17,6 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: 📦 Clone Core TelDrive Backend (Latest Code)
-        uses: actions/checkout@v4
-        with:
-          repository: tgdrive/teldrive
-          path: teldrive-backend
-
       - name: ⚙️ Install Tools (Aria2 & Custom Rclone)
         run: |
           sudo apt-get update && sudo apt-get install -y aria2
@@ -37,18 +26,23 @@ jobs:
           sudo chmod +x /usr/bin/rclone
           rm -rf rclone-v1.73.1-linux-amd64*
 
+      - name: 🚀 Install Official TelDrive Binary
+        run: |
+          wget -q https://github.com/tgdrive/teldrive/releases/download/1.8.3/teldrive-1.8.3-linux-amd64.tar.gz
+          tar -xzf teldrive-1.8.3-linux-amd64.tar.gz
+          sudo mv teldrive /usr/bin/teldrive
+          sudo chmod +x /usr/bin/teldrive
+          rm -f teldrive-1.8.3-linux-amd64.tar.gz
+
       - name: 🌐 Start TelDrive Server in Background
         run: |
-          cd teldrive-backend
-          # Running from latest source code fixes the Supabase PgBouncer crash!
-          go run main.go run \
+          teldrive run \
             --db-data-source="${{ secrets.TELDRIVE_SUPABASE_DSN }}" \
             --jwt-secret="${{ secrets.TELDRIVE_JWT_SECRET }}" \
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
-          
-          sleep 15
+          sleep 10
           
       - name: 🔑 Configure Rclone Authentication
         run: |
