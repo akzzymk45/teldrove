@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir movie_download
           cd movie_download
-          aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "${{ github.event.inputs.movie_url }}"
+          aria2c --content-disposition --summary-interval=10 --console-log-level=warn "${{ github.event.inputs.movie_url }}"
 
       - name: ☁️ Upload Movie to Telegram via TelDrive
         run: |
