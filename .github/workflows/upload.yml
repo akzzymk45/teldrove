@@ -12,40 +12,44 @@ on:
         required: true
         type: string
       folder_name:
-        description: 'Target Folder in TelDrive (e.g., Movies)'
+        description: 'Target Folder in TelDrive'
         required: false
-        default: 'Movies'
+        default: 'github'
         type: string
 
 jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
+      - name: ⚙️ Install Custom Teldrive Rclone
+        run: |
+          echo "Downloading custom Rclone..."
+          wget -q https://github.com/tgdrive/rclone/releases/download/v1.73.1/rclone-v1.73.1-linux-amd64.zip
+          unzip -q rclone-v1.73.1-linux-amd64.zip
+          sudo mv rclone-v1.73.1-linux-amd64/rclone /usr/bin/rclone
+          sudo chmod +x /usr/bin/rclone
+          rm -rf rclone-v1.73.1-linux-amd64*
 
-      - name: 📦 Clone Core TelDrive Backend
-        uses: actions/checkout@v4
-        with:
-          repository: tgdrive/teldrive
-          path: teldrive-backend
-
-      - name: ⚙️ Install Rclone
-        run: sudo apt-get update && sudo apt-get install -y rclone
+      - name: 🚀 Install Official TelDrive Binary
+        run: |
+          echo "Downloading TelDrive 1.8.3..."
+          wget -q https://github.com/tgdrive/teldrive/releases/download/1.8.3/teldrive-1.8.3-linux-amd64.tar.gz
+          tar -xzf teldrive-1.8.3-linux-amd64.tar.gz
+          sudo mv teldrive /usr/bin/teldrive
+          sudo chmod +x /usr/bin/teldrive
+          rm -f teldrive-1.8.3-linux-amd64.tar.gz
 
       - name: 🌐 Start TelDrive Server in Background
         run: |
-          cd teldrive-backend
-          go run main.go run \
+          echo "Booting up TelDrive Server..."
+          teldrive run \
             --db-data-source="${{ secrets.TELDRIVE_SUPABASE_DSN }}" \
             --jwt-secret="${{ secrets.TELDRIVE_JWT_SECRET }}" \
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
           
-          # Wait 10 seconds to ensure the server is fully started
+          # Wait 10 seconds to ensure the server starts properly
           sleep 10
           
       - name: 🔑 Configure Rclone Authentication
@@ -59,15 +63,17 @@ jobs:
           bearer_token = ${{ secrets.TELDRIVE_TOKEN }}
           EOF
 
-      - name: 📥 Download Movie to Runner
+      - name: 📥 Download Movie to Azure Runner
         run: |
-          echo "Downloading movie from URL..."
+          echo "Downloading movie from URL to Azure fast servers..."
           wget -q --show-progress -O "${{ github.event.inputs.file_name }}" "${{ github.event.inputs.movie_url }}"
 
       - name: ☁️ Upload Movie to Telegram via TelDrive
         run: |
-          echo "Uploading to TelDrive Folder: ${{ github.event.inputs.folder_name }}"
+          echo "Uploading to TelDrive Folder: teldrive:${{ github.event.inputs.folder_name }}"
           rclone copy "${{ github.event.inputs.file_name }}" teldrive:${{ github.event.inputs.folder_name }}/ -v --progress
           
       - name: 🧹 Cleanup Space
-        run: rm -f "${{ github.event.inputs.file_name }}"
+        run: |
+          echo "Upload complete! Deleting local file to free up runner space..."
+          rm -f "${{ github.event.inputs.file_name }}"
