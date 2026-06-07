@@ -12,10 +12,6 @@ on:
         required: false
         default: 'Remote'
         type: string
-      chat_id:
-        description: 'Telegram Chat ID to notify'
-        required: false
-        type: string
 
 jobs:
   upload:
@@ -85,11 +81,9 @@ jobs:
               
             rm -rf ./movie_download/*
             
-            # 🔥 Ping the Telegram Bot when finished!
-            if [ -n "${{ github.event.inputs.chat_id }}" ]; then
-              curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-                -d chat_id="${{ github.event.inputs.chat_id }}" \
-                -d text="✅ Upload Complete! Finished moving to ${{ github.event.inputs.folder_name }}"
-            fi
+            # 🔥 Ping your personal Telegram Account when finished!
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d text="✅ Upload Complete! Finished moving to ${{ github.event.inputs.folder_name }}"
             
           done
