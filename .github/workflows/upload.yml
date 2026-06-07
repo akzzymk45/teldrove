@@ -52,7 +52,7 @@ jobs:
           type = teldrive
           api_host = http://127.0.0.1:8080/
           access_token = ${{ secrets.TELDRIVE_TOKEN }}
-          chunk_size = 100M
+          chunk_size = 500M
           upload_concurrency = 8
           encrypt_files = false
           random_chunk_name = true
@@ -77,7 +77,7 @@ jobs:
             cd ..
             
             rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
-              --multi-thread-streams=8 --multi-thread-chunk-size=100M --use-mmap --stats 10s --stats-one-line -v
+              --multi-thread-streams=8 --multi-thread-chunk-size=500M --use-mmap --stats 10s --stats-one-line -v
               
             rm -rf ./movie_download/*
             
