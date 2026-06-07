@@ -17,17 +17,6 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: 📦 Clone Core TelDrive Backend
-        uses: actions/checkout@v4
-        with:
-          repository: tgdrive/teldrive
-          path: teldrive-backend
-
       - name: ⚙️ Install Tools (Aria2 & Custom Rclone)
         run: |
           sudo apt-get update && sudo apt-get install -y aria2
@@ -37,17 +26,24 @@ jobs:
           sudo chmod +x /usr/bin/rclone
           rm -rf rclone-v1.73.1-linux-amd64*
 
+      - name: 🚀 Install Official TelDrive Binary
+        run: |
+          wget -q https://github.com/tgdrive/teldrive/releases/download/1.8.3/teldrive-1.8.3-linux-amd64.tar.gz
+          tar -xzf teldrive-1.8.3-linux-amd64.tar.gz
+          sudo mv teldrive /usr/bin/teldrive
+          sudo chmod +x /usr/bin/teldrive
+          rm -f teldrive-1.8.3-linux-amd64.tar.gz
+
       - name: 🌐 Start TelDrive Server in Background
         run: |
-          cd teldrive-backend
-          go run main.go run \
+          teldrive run \
             --db-data-source="${{ secrets.TELDRIVE_SUPABASE_DSN }}" \
             --jwt-secret="${{ secrets.TELDRIVE_JWT_SECRET }}" \
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
           
-          sleep 15
+          sleep 10
           
       - name: 🔑 Configure Rclone Authentication
         run: |
@@ -65,14 +61,11 @@ jobs:
 
       - name: 🔄 Batch Download & Upload (With Cleanup)
         run: |
-          # Convert any commas or newlines you accidentally pasted into spaces
           RAW_URLS="${{ github.event.inputs.movie_urls }}"
           CLEAN_URLS=$(echo "$RAW_URLS" | tr ',' ' ' | tr '\n' ' ')
           
-          # Create the isolated staging folder
           mkdir -p movie_download
           
-          # Loop through every single URL you provided
           for url in $CLEAN_URLS; do
             if [ -z "$url" ]; then continue; fi
             
@@ -82,13 +75,11 @@ jobs:
             
             cd movie_download
             
-            # 1. Download
             echo "📥 DOWNLOADING to Azure Disk..."
-            aria2c --content-disposition --summary-interval=10 --console-log-level=warn "$url"
+            aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "$url"
             
             cd ..
             
-            # 2. Upload
             echo "☁️ UPLOADING to Telegram via TelDrive..."
             rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
               --multi-thread-streams=8 \
@@ -96,9 +87,7 @@ jobs:
               --use-mmap \
               --stats 10s --stats-one-line -v
               
-            # 3. Secure Wipe
-            echo "🧹 DELETING file from Azure to free up space for the next link..."
+            echo "🧹 DELETING file from Azure to free up space..."
             rm -rf ./movie_download/*
             
-            echo "✅ FINISHED! Moving to next link..."
           done
