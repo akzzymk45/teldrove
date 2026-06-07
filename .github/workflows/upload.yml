@@ -10,7 +10,11 @@ on:
       folder_name:
         description: 'Target Folder in TelDrive'
         required: false
-        default: 'github'
+        default: 'Remote'
+        type: string
+      chat_id:
+        description: 'Telegram Chat ID to notify'
+        required: false
         type: string
 
 jobs:
@@ -42,7 +46,6 @@ jobs:
             --tg-app-id="${{ secrets.TELDRIVE_TG_APP_ID }}" \
             --tg-app-hash="${{ secrets.TELDRIVE_TG_APP_HASH }}" \
             --tg-uploads-encryption-key="${{ secrets.TELDRIVE_TG_UPLOADS_ENCRYPTION_KEY }}" &
-          
           sleep 10
           
       - name: 🔑 Configure Rclone Authentication
@@ -74,20 +77,19 @@ jobs:
             echo "=================================================="
             
             cd movie_download
-            
-            echo "📥 DOWNLOADING to Azure Disk..."
             aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "$url"
-            
             cd ..
             
-            echo "☁️ UPLOADING to Telegram via TelDrive..."
             rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
-              --multi-thread-streams=8 \
-              --multi-thread-chunk-size=100M \
-              --use-mmap \
-              --stats 10s --stats-one-line -v
+              --multi-thread-streams=8 --multi-thread-chunk-size=100M --use-mmap --stats 10s --stats-one-line -v
               
-            echo "🧹 DELETING file from Azure to free up space..."
             rm -rf ./movie_download/*
+            
+            # 🔥 Ping the Telegram Bot when finished!
+            if [ -n "${{ github.event.inputs.chat_id }}" ]; then
+              curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                -d chat_id="${{ github.event.inputs.chat_id }}" \
+                -d text="✅ Upload Complete! Finished moving to ${{ github.event.inputs.folder_name }}"
+            fi
             
           done
