@@ -76,7 +76,7 @@ jobs:
             aria2c -x 16 -s 16 --content-disposition --summary-interval=10 --console-log-level=warn "$url"
             cd ..
             
-            rclone copy ./movie_download/ teldrive:${{ github.event.inputs.folder_name }}/ \
+            rclone copy ./movie_download/ "teldrive:${{ github.event.inputs.folder_name }}/" \
               --multi-thread-streams=8 --multi-thread-chunk-size=500M --use-mmap --stats 10s --stats-one-line -v
               
             rm -rf ./movie_download/*
